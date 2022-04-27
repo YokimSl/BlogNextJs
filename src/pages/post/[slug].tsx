@@ -1,4 +1,5 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
+import { RichText } from 'prismic-dom';
 import { FiCalendar, FiClock, FiUser } from 'react-icons/fi';
 import Header from '../../components/Header';
 
@@ -39,30 +40,30 @@ export default function Post({ post }: PostProps) {
           <h1>Algum tipo de exemplo</h1>
           <ul>
             <li>
-              <FiCalendar />
-              12 mar 2022
+              <FiCalendar />12 mar 2022
             </li>
             <li>
-              <FiUser />
-             Jhonnata
+              <FiUser />Jhonnata
             </li>
             <li>
-              <FiClock />
-              5 minutos
+              <FiClock />5 minutos
             </li>
           </ul>
         </div>
 
-        <article>
-          <h2>Titulo seçao</h2>
-          <p>
-            Lorem ipsum dolor sit amet consectetur adipisicing elit.
-            Libero eaque <strong>necessitatibus accusantium autem repudiandae</strong> sit, 
-            dicta, <a href="#"> cupiditate sint id aliquam </a> in a voluptates fugiat ut 
-            dolor beatae itaque eveniet at?
-
-          </p>
-        </article>
+        {post.data.content.map(content => {
+          return(
+            <article key={content.heading}>
+            <h2>{content.heading}</h2>
+            <div 
+            className={styles.postContent}
+            dangerouslySetInnerHTML={{
+              __html: RichText.asHtml(content.body),
+            }}
+            />
+          </article>
+          )
+        })}
 
       </div>
     </main>
@@ -70,16 +71,44 @@ export default function Post({ post }: PostProps) {
   );
 }
 
-// export const getStaticPaths = async () => {
-//   const prismic = getPrismicClient({});
-//   const posts = await prismic.getByType(TODO);
+export const getStaticPaths: GetStaticPaths = async () => {
+  // const prismic = getPrismicClient({});
+  // const posts = await prismic.getByType(TODO);
 
-//   // TODO
-// };
+ return {
+   paths: [],
+   fallback: true,
+ }
+};
 
-// export const getStaticProps = async ({params }) => {
-//   const prismic = getPrismicClient({});
-//   const response = await prismic.getByUID(TODO);
+export const getStaticProps: GetStaticProps = async context => {
+  const prismic = getPrismicClient();
+  const { slug } = context.params;
+  const response = await prismic.getByUID<any>('posts', String(slug), {});
 
-//   // TODO
-// };
+  const post = {
+    uid: response.uid,
+    first_publication_date: response.first_publication_date,
+    data: {
+      title: response.data.title,
+      subtitle: response.data.subtitle,
+      author: response.data.author,
+      banner: {
+        url: response.data.banner.url,
+      },
+      content: response.data.content.map(content => {
+        return {
+          heading: content.heading,
+          body: [...content.body]
+        };
+      }),
+    },
+  }
+
+  return {
+    props:{
+      post,
+    }
+
+  }
+};
