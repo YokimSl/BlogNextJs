@@ -2,11 +2,14 @@ import { GetStaticPaths, GetStaticProps } from 'next';
 import { RichText } from 'prismic-dom';
 import { FiCalendar, FiClock, FiUser } from 'react-icons/fi';
 import Header from '../../components/Header';
-
+import { format } from 'date-fns'
+import {ptBR} from 'date-fns/locale'
+import Prismic from '@prismicio/client'
 import { getPrismicClient } from '../../services/prismic';
-
+import Head  from 'next/head'
 import commonStyles from '../../styles/common.module.scss';
 import styles from './post.module.scss';
+import { useRouter } from 'next/router';
 
 interface Post {
   first_publication_date: string | null;
@@ -30,23 +33,48 @@ interface PostProps {
 }
 
 export default function Post({ post }: PostProps) {
+
+  const router = useRouter();
+
+  if (router.isFallback){
+    return <h1>Carregando...</h1>
+  }
+  const totalWords = post.data.content.reduce((total, contentItem) => {
+    total += contentItem.heading.split(' ').length;
+
+    const words = contentItem.body.map(item => item.text.split(' ').length);
+    words.map(word => (total += word));
+    return total;
+  }, 0);
+  const readTime = Math.ceil(totalWords / 200);
+
+  const formatedData = format(
+    new Date(post.first_publication_date),
+    'dd MMM yyyy',
+    {
+      locale:ptBR,
+    }
+  )
   return(
     <>
+    <Head>
+      <title>{`${post.data.title}`}</title>
+    </Head>
     <Header />
-    <img src="/Banner.png" alt="imagem" className={styles.banner}/>
+    <img src={post.data.banner.url} alt="imagem" className={styles.banner}/>
     <main className={commonStyles.container}>
       <div className={styles.post}>
         <div className={styles.postTop}>
-          <h1>Algum tipo de exemplo</h1>
+          <h1>{post.data.title}</h1>
           <ul>
             <li>
-              <FiCalendar />12 mar 2022
+              <FiCalendar />{formatedData  }
             </li>
             <li>
-              <FiUser />Jhonnata
+              <FiUser />{post.data.author}
             </li>
             <li>
-              <FiClock />5 minutos
+              <FiClock />{`${readTime} min`}
             </li>
           </ul>
         </div>
@@ -72,11 +100,21 @@ export default function Post({ post }: PostProps) {
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  // const prismic = getPrismicClient({});
-  // const posts = await prismic.getByType(TODO);
+  const prismic = getPrismicClient();
+  const posts = await prismic.query([
+    Prismic.Predicates.at('document.type', 'posts'),
+  ]);
+
+  const paths = posts.results.map(post => {
+    return{
+      params: {
+        slug: post.uid,
+      },
+    }
+  })
 
  return {
-   paths: [],
+   paths,
    fallback: true,
  }
 };
